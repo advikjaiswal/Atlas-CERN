@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS-Inspired Particle Detector Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            flex: 2;
+            position: relative;
+        }
+
+        #controls {
+            flex: 1;
+            background: #1a1a1a;
+            padding: 20px;
+            border-left: 2px solid #00ff00;
+            overflow-y: auto;
+            max-width: 400px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            padding: 15px;
+            background: #111;
+        }
+
+        .control-group h3 {
+            margin-top: 0;
+            color: #00ff88;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        button {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            margin: 5px;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        #stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #00ff00;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .histogram {
+            width: 100%;
+            height: 150px;
+            border: 1px solid #333;
+            background: #0a0a0a;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .bin {
+            position: absolute;
+            bottom: 0;
+            background: #00ff00;
+            opacity: 0.7;
+            transition: height 0.3s;
+        }
+
+        #physics-info {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.3;
+        }
+
+        .equation {
+            background: #222;
+            padding: 5px;
+            margin: 5px 0;
+            font-family: 'Times New Roman', serif;
+            color: #ffaa00;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container">
+            <div id="stats">
+                <div>Events Generated: <span id="event-count">0</span></div>
+                <div>Tracks Reconstructed: <span id="track-count">0</span></div>
+                <div>Reconstruction Efficiency: <span id="efficiency">0%</span></div>
+                <div>Mean χ²/DoF: <span id="chi2">0.0</span></div>
+                <div>B-Field: <span id="bfield">2.0</span> T</div>
+            </div>
+        </div>
+        
+        <div id="controls">
+            <h2>ATLAS Inner Detector Simulation</h2>
+            
+            <div class="control-group">
+                <h3>Beam Parameters</h3>
+                <label for="energy">Particle Energy (GeV): <span id="energy-val">10</span></label>
+                <input type="range" id="energy" name="energy" min="1" max="100" value="10" 
+                       title="Adjust particle beam energy from 1 to 100 GeV" 
+                       aria-label="Particle Energy in GeV">
+                
+                <label for="rate">Production Rate (Hz): <span id="rate-val">2</span></label>
+                <input type="range" id="rate" name="rate" min="0.5" max="10" step="0.5" value="2"
+                       title="Set particle production rate from 0.5 to 10 Hz"
+                       aria-label="Particle Production Rate in Hz">
+                
+                <label for="particle-type">Particle Type:</label>
+                <select id="particle-type" name="particle-type" 
+                        title="Choose the type of particle to simulate"
+                        aria-label="Select particle type for simulation">
+                    <option value="muon">Muon (μ±)</option>
+                    <option value="pion">Pion (π±)</option>
+                    <option value="electron">Electron (e±)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <h3>Detector Settings</h3>
+                <label for="magnetic">Magnetic Field (T): <span id="magnetic-val">2.0</span></label>
+                <input type="range" id="magnetic" name="magnetic" min="0" max="4" step="0.1" value="2.0"
+                       title="Adjust solenoid magnetic field strength from 0 to 4 Tesla"
+                       aria-label="Magnetic Field Strength in Tesla">
+                
+                <label for="material">Material Budget (%): <span id="material-val">2</span></label>
+                <input type="range" id="material" name="material" min="0.5" max="10" step="0.5" value="2"
+                       title="Set detector material budget as percentage of radiation length"
+                       aria-label="Material Budget Percentage">
+                
+                <label for="efficiency-slider">Hit Efficiency (%): <span id="efficiency-val">95</span></label>
+                <input type="range" id="efficiency-slider" name="efficiency-slider" min="70" max="100" value="95"
+                       title="Detector hit detection efficiency from 70% to 100%"
+                       aria-label="Detector Hit Efficiency Percentage">
+            </div>
+
+            <div class="control-group">
+                <h3>Kalman Filter</h3>
+                <label for="process-noise">Process Noise: <span id="process-val">0.1</span></label>
+                <input type="range" id="process-noise" name="process-noise" min="0.01" max="1" step="0.01" value="0.1"
+                       title="Kalman filter process noise parameter for track prediction uncertainty"
+                       aria-label="Kalman Filter Process Noise Parameter">
+                
+                <label for="measure-noise">Measurement Noise: <span id="measure-val">0.05</span></label>
+                <input type="range" id="measure-noise" name="measure-noise" min="0.01" max="0.5" step="0.01" value="0.05"
+                       title="Detector measurement noise for Kalman filter hit uncertainty"
+                       aria-label="Kalman Filter Measurement Noise Parameter">
+                
+                <button id="clear-tracks" type="button" 
+                        title="Remove all particle tracks from the display"
+                        aria-label="Clear all particle tracks">Clear All Tracks</button>
+                <button id="pause-sim" type="button"
+                        title="Pause or resume the particle simulation"
+                        aria-label="Pause or resume simulation">Pause</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Momentum Distribution</h3>
+                <div class="histogram" id="momentum-hist"></div>
+            </div>
+
+            <div class="control-group">
+                <h3>Physics Background</h3>
+                <div id="physics-info">
+                    <p><strong>Simulation Models:</strong></p>
+                    <div class="equation">Lorentz Force: F = q(v × B)</div>
+                    <div class="equation">Multiple Scattering: θ₀ = 13.6/(βp)√(x/X₀)</div>
+                    <div class="equation">Kalman Prediction: x̂ₖ₊₁ = Fₖx̂ₖ</div>
+                    <div class="equation">Kalman Update: x̂ₖ = x̂ₖ⁻ + Kₖ(zₖ - Hₖx̂ₖ⁻)</div>
+                    
+                    <p><strong>ATLAS Inner Detector:</strong></p>
+                    <ul style="font-size: 10px;">
+                        <li>4 concentric detector layers</li>
+                        <li>Silicon pixel & strip detectors</li>
+                        <li>2T solenoid magnetic field</li>
+                        <li>~10 μm spatial resolution</li>
+                        <li>Multiple scattering in materials</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script>
+        // Global simulation parameters
+        const SIM_CONFIG = {
+            particleEnergy: 10,
+            particleRate: 2,
+            particleType: 'muon',
+            magneticField: 2.0,
+            materialBudget: 2,
+            hitEfficiency: 95,
+            processNoise: 0.1,
+            measurementNoise: 0.05,
+            isPaused: false
+        };
+
+        // Physics constants
+        const PHYSICS = {
+            c: 299792458, // speed of light (m/s)
+            masses: {
+                muon: 105.66, // MeV/c²
+                pion: 139.57,
+                electron: 0.511
+            },
+            detectorLayers: [
+                { radius: 4, name: 'Pixel L0', material: 0.3 },
+                { radius: 7, name: 'Pixel L1', material: 0.3 },
+                { radius: 11, name: 'SCT L0', material: 0.8 },
+                { radius: 15, name: 'SCT L1', material: 0.8 }
+            ]
+        };
+
+        // Three.js setup
+        let scene, camera, renderer, stats;
+        let particles = [];
+        let tracks = [];
+        let detectorGeometry = [];
+        let eventCount = 0;
+        let trackCount = 0;
+        let momentumHistogram = [];
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000011);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(30, 20, 30);
+            camera.lookAt(0, 0, 0);
+
+            // Renderer setup
+            const canvasContainer = document.getElementById('canvas-container');
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            canvasContainer.appendChild(renderer.domElement);
+
+            // Create detector geometry
+            createDetectorGeometry();
+            
+            // Initialize histogram
+            initMomentumHistogram();
+            
+            // Setup controls
+            setupControls();
+            
+            // Start simulation
+            animate();
+        }
+
+        function createDetectorGeometry() {
+            // Create detector layers
+            PHYSICS.detectorLayers.forEach((layer, index) => {
+                const geometry = new THREE.CylinderGeometry(layer.radius, layer.radius, 40, 32, 1, true);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0x003366,
+                    transparent: true,
+                    opacity: 0.3,
+                    wireframe: true
+                });
+                const cylinder = new THREE.Mesh(geometry, material);
+                cylinder.rotation.x = Math.PI / 2;
+                scene.add(cylinder);
+                detectorGeometry.push(cylinder);
+            });
+
+            // Add coordinate axes
+            const axesHelper = new THREE.AxesHelper(25);
+            scene.add(axesHelper);
+
+            // Add beam pipe
+            const beamGeometry = new THREE.CylinderGeometry(2, 2, 40, 16);
+            const beamMaterial = new THREE.MeshBasicMaterial({
+                color: 0x444444,
+                transparent: true,
+                opacity: 0.5
+            });
+            const beamPipe = new THREE.Mesh(beamGeometry, beamMaterial);
+            beamPipe.rotation.x = Math.PI / 2;
+            scene.add(beamPipe);
+        }
+
+        // Particle physics simulation class
+        class Particle {
+            constructor(energy, type, charge) {
+                this.type = type;
+                this.charge = charge;
+                this.mass = PHYSICS.masses[type];
+                this.energy = energy * 1000; // Convert to MeV
+                
+                // Calculate momentum: E² = (pc)² + (mc²)²
+                this.momentum = Math.sqrt(this.energy * this.energy - this.mass * this.mass);
+                
+                // Initial position and direction (random within beam spot)
+                this.position = new THREE.Vector3(
+                    (Math.random() - 0.5) * 2,
+                    (Math.random() - 0.5) * 2,
+                    -20
+                );
+                
+                // Initial momentum direction (small angular spread)
+                const theta = (Math.random() - 0.5) * 0.1; // ±50 mrad spread
+                const phi = Math.random() * 2 * Math.PI;
+                
+                // Create unit direction vector
+                const direction = new THREE.Vector3(
+                    Math.sin(theta) * Math.cos(phi),
+                    Math.sin(theta) * Math.sin(phi),
+                    Math.cos(theta)
+                ).normalize();
+                
+                // Calculate momentum components directly (in MeV/c)
+                const px = direction.x * this.momentum;
+                const py = direction.y * this.momentum;
+                const pz = direction.z * this.momentum;
+                
+                // Velocity for visualization (approximate, for movement)
+                this.velocity = direction.clone().multiplyScalar(this.momentum / this.mass);
+
+                // Track creation
+                this.hits = [];
+                this.truePath = [];
+                this.reconstructedPath = [];
+                
+                // Visual representation
+                this.mesh = this.createMesh();
+                scene.add(this.mesh);
+                
+                // Kalman filter state [x, y, px, py] - momentum in MeV/c
+                this.kalmanState = new Float32Array([
+                    this.position.x,
+                    this.position.y,
+                    px, // px in MeV/c
+                    py  // py in MeV/c
+                ]);
+                
+                // Store z-momentum component for histogram calculation
+                this.pz = pz;
+                
+                // Add initial momentum to histogram immediately
+                this.addToMomentumHistogram();
+                
+                this.kalmanCovariance = this.createCovarianceMatrix();
+            }
+
+            createMesh() {
+                const geometry = new THREE.SphereGeometry(0.3, 8, 6);
+                const color = this.type === 'muon' ? 0xff0000 : 
+                             this.type === 'pion' ? 0x00ff00 : 0x0000ff;
+                const material = new THREE.MeshBasicMaterial({ color });
+                return new THREE.Mesh(geometry, material);
+            }
+
+            createCovarianceMatrix() {
+                // 4x4 covariance matrix for [x, y, px, py]
+                const cov = new Float32Array(16);
+                // Initialize with process noise
+                cov[0] = cov[5] = SIM_CONFIG.processNoise; // position uncertainty
+                cov[10] = cov[15] = SIM_CONFIG.processNoise * 10; // momentum uncertainty
+                return cov;
+            }
+
+            update(deltaTime) {
+                if (this.position.z > 20) {
+                    this.remove();
+                    return false;
+                }
+
+                // Store true path
+                this.truePath.push(this.position.clone());
+
+                // Physics simulation
+                this.applyLorentzForce(deltaTime);
+                this.applyMultipleScattering();
+                this.checkDetectorHits();
+
+                // Update position
+                this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+                this.mesh.position.copy(this.position);
+
+                return true;
+            }
+
+            applyLorentzForce(deltaTime) {
+                // F = q(v × B), B = (0, 0, Bz)
+                const qOverM = this.charge / this.mass;
+                const cyclotronFreq = qOverM * SIM_CONFIG.magneticField;
+                
+                // Circular motion in magnetic field
+                const vx = this.velocity.x;
+                const vy = this.velocity.y;
+                
+                this.velocity.x = vx * Math.cos(cyclotronFreq * deltaTime) - 
+                                 vy * Math.sin(cyclotronFreq * deltaTime);
+                this.velocity.y = vx * Math.sin(cyclotronFreq * deltaTime) + 
+                                 vy * Math.cos(cyclotronFreq * deltaTime);
+            }
+
+            applyMultipleScattering() {
+                // Highland formula for multiple scattering
+                PHYSICS.detectorLayers.forEach(layer => {
+                    const distance = Math.abs(Math.sqrt(this.position.x * this.position.x + 
+                                                       this.position.y * this.position.y) - layer.radius);
+                    
+                    if (distance < 0.5) { // Hit layer
+                        const radiationLength = layer.material * SIM_CONFIG.materialBudget / 100;
+                        const beta = this.velocity.length() / PHYSICS.c;
+                        const theta0 = 13.6 / (beta * this.momentum) * Math.sqrt(radiationLength) * 
+                                      (1 + 0.038 * Math.log(radiationLength));
+                        
+                        // Apply random scattering
+                        const scatterX = (Math.random() - 0.5) * theta0;
+                        const scatterY = (Math.random() - 0.5) * theta0;
+                        
+                        this.velocity.x += scatterX * this.velocity.length();
+                        this.velocity.y += scatterY * this.velocity.length();
+                        this.velocity.normalize().multiplyScalar(this.momentum / this.mass);
+                    }
+                });
+            }
+
+            checkDetectorHits() {
+                PHYSICS.detectorLayers.forEach((layer, index) => {
+                    const r = Math.sqrt(this.position.x * this.position.x + 
+                                       this.position.y * this.position.y);
+                    
+                    if (Math.abs(r - layer.radius) < 0.5 && Math.random() < SIM_CONFIG.hitEfficiency / 100) {
+                        // Create detector hit with measurement noise
+                        const hitX = this.position.x + (Math.random() - 0.5) * SIM_CONFIG.measurementNoise;
+                        const hitY = this.position.y + (Math.random() - 0.5) * SIM_CONFIG.measurementNoise;
+                        const hitZ = this.position.z + (Math.random() - 0.5) * SIM_CONFIG.measurementNoise;
+                        
+                        const hit = {
+                            position: new THREE.Vector3(hitX, hitY, hitZ),
+                            layer: index,
+                            time: Date.now()
+                        };
+                        
+                        this.hits.push(hit);
+                        this.visualizeHit(hit);
+                        this.updateKalmanFilter(hit);
+                    }
+                });
+            }
+
+            visualizeHit(hit) {
+                const geometry = new THREE.SphereGeometry(0.2, 6, 4);
+                const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(hit.position);
+                scene.add(mesh);
+                
+                // Remove hit visualization after 2 seconds
+                setTimeout(() => {
+                    scene.remove(mesh);
+                }, 2000);
+            }
+
+            updateKalmanFilter(hit) {
+                // Simplified Kalman filter implementation
+                // Prediction step
+                const F = new Float32Array([
+                    1, 0, 0.01, 0,    // x = x + px*dt
+                    0, 1, 0, 0.01,    // y = y + py*dt
+                    0, 0, 1, 0,       // px = px
+                    0, 0, 0, 1        // py = py
+                ]);
+                
+                // Update step with hit measurement
+                const H = new Float32Array([
+                    1, 0, 0, 0,  // Measure x
+                    0, 1, 0, 0   // Measure y
+                ]);
+                
+                // Measurement vector
+                const z = new Float32Array([hit.position.x, hit.position.y]);
+                
+                // Innovation (measurement - prediction)
+                const innovation = new Float32Array([
+                    z[0] - this.kalmanState[0],
+                    z[1] - this.kalmanState[1]
+                ]);
+                
+                // Simple Kalman gain (simplified)
+                const K = 0.3; // Kalman gain
+                
+                // Update state
+                this.kalmanState[0] += K * innovation[0];
+                this.kalmanState[1] += K * innovation[1];
+                
+                // Store reconstructed point
+                this.reconstructedPath.push(new THREE.Vector3(
+                    this.kalmanState[0],
+                    this.kalmanState[1],
+                    hit.position.z
+                ));
+                
+                this.visualizeReconstructedTrack();
+            }
+
+            visualizeReconstructedTrack() {
+                if (this.reconstructedPath.length < 2) return;
+                
+                // Create line geometry for reconstructed track
+                const points = this.reconstructedPath.slice(-10); // Show last 10 points
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0x00ffff,
+                    linewidth: 2
+                });
+                
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                
+                // Remove old track segments
+                setTimeout(() => {
+                    scene.remove(line);
+                }, 3000);
+            }
+
+            addToMomentumHistogram() {
+                // Calculate total momentum magnitude using stored components
+                const px = this.kalmanState[2];
+                const py = this.kalmanState[3];
+                const pz = this.pz;
+                const pTotal = Math.sqrt(px*px + py*py + pz*pz);
+                
+                // Convert to GeV and create bins (20 bins, 5 GeV per bin = 0-100 GeV range)
+                const p_GeV = pTotal / 1000;
+                const bin = Math.floor(p_GeV / 5); // 5 GeV per bin
+                
+                // Ensure bin is within range
+                if (bin >= 0 && bin < momentumHistogram.length) {
+                    momentumHistogram[bin]++;
+                    updateHistogramDisplay();
+                }
+            }
+
+            remove() {
+                scene.remove(this.mesh);
+                if (this.hits.length >= 1) { // Count as reconstructed track if at least 1 hit
+                    trackCount++;
+                }
+            }
+        }
+
+        function generateParticle() {
+            if (SIM_CONFIG.isPaused) return;
+            
+            eventCount++;
+            const charge = Math.random() > 0.5 ? 1 : -1;
+            const particle = new Particle(SIM_CONFIG.particleEnergy, SIM_CONFIG.particleType, charge);
+            particles.push(particle);
+            
+            updateStats();
+        }
+
+        function initMomentumHistogram() {
+            momentumHistogram = new Array(20).fill(0); // 20 bins covering 0-100 GeV (5 GeV per bin)
+            createHistogramBins();
+        }
+
+        function createHistogramBins() {
+            const histContainer = document.getElementById('momentum-hist');
+            histContainer.innerHTML = '';
+            
+            for (let i = 0; i < momentumHistogram.length; i++) {
+                const bin = document.createElement('div');
+                bin.className = 'bin';
+                bin.style.left = `${(i / momentumHistogram.length) * 100}%`;
+                bin.style.width = `${100 / momentumHistogram.length}%`;
+                bin.style.height = '0%';
+                // Each bin represents 5 GeV range
+                const binMin = i * 5;
+                const binMax = (i + 1) * 5;
+                bin.title = `${binMin}-${binMax} GeV: 0 tracks`;
+                histContainer.appendChild(bin);
+            }
+        }
+
+        function updateHistogramDisplay() {
+            const bins = document.querySelectorAll('.bin');
+            const maxCount = Math.max(...momentumHistogram, 1);
+            
+            bins.forEach((bin, index) => {
+                const height = (momentumHistogram[index] / maxCount) * 100;
+                bin.style.height = `${height}%`;
+                // Each bin represents 5 GeV range
+                const binMin = index * 5;
+                const binMax = (index + 1) * 5;
+                bin.title = `${binMin}-${binMax} GeV: ${momentumHistogram[index]} tracks`;
+            });
+        }
+
+        function setupControls() {
+            // Energy control
+            const energySlider = document.getElementById('energy');
+            const energyVal = document.getElementById('energy-val');
+            energySlider.addEventListener('input', (e) => {
+                SIM_CONFIG.particleEnergy = parseFloat(e.target.value);
+                energyVal.textContent = e.target.value;
+            });
+
+            // Rate control
+            const rateSlider = document.getElementById('rate');
+            const rateVal = document.getElementById('rate-val');
+            rateSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.particleRate = parseFloat(e.target.value);
+                rateVal.textContent = e.target.value;
+            });
+
+            // Particle type
+            const particleSelect = document.getElementById('particle-type');
+            particleSelect.addEventListener('change', (e) => {
+                SIM_CONFIG.particleType = e.target.value;
+            });
+
+            // Magnetic field
+            const magneticSlider = document.getElementById('magnetic');
+            const magneticVal = document.getElementById('magnetic-val');
+            magneticSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.magneticField = parseFloat(e.target.value);
+                magneticVal.textContent = e.target.value;
+                document.getElementById('bfield').textContent = e.target.value;
+            });
+
+            // Material budget
+            const materialSlider = document.getElementById('material');
+            const materialVal = document.getElementById('material-val');
+            materialSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.materialBudget = parseFloat(e.target.value);
+                materialVal.textContent = e.target.value;
+            });
+
+            // Hit efficiency
+            const effSlider = document.getElementById('efficiency-slider');
+            const effVal = document.getElementById('efficiency-val');
+            effSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.hitEfficiency = parseFloat(e.target.value);
+                effVal.textContent = e.target.value;
+            });
+
+            // Process noise
+            const processSlider = document.getElementById('process-noise');
+            const processVal = document.getElementById('process-val');
+            processSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.processNoise = parseFloat(e.target.value);
+                processVal.textContent = e.target.value;
+            });
+
+            // Measurement noise
+            const measureSlider = document.getElementById('measure-noise');
+            const measureVal = document.getElementById('measure-val');
+            measureSlider.addEventListener('input', (e) => {
+                SIM_CONFIG.measurementNoise = parseFloat(e.target.value);
+                measureVal.textContent = e.target.value;
+            });
+
+            // Clear tracks button
+            document.getElementById('clear-tracks').addEventListener('click', () => {
+                particles.forEach(p => p.remove());
+                particles = [];
+                eventCount = 0;
+                trackCount = 0;
+                momentumHistogram.fill(0);
+                updateHistogramDisplay();
+                updateStats();
+            });
+
+            // Pause button
+            const pauseBtn = document.getElementById('pause-sim');
+            pauseBtn.addEventListener('click', () => {
+                SIM_CONFIG.isPaused = !SIM_CONFIG.isPaused;
+                pauseBtn.textContent = SIM_CONFIG.isPaused ? 'Resume' : 'Pause';
+            });
+
+            // Camera controls with mouse
+            let mouseX = 0, mouseY = 0;
+            let isMouseDown = false;
+
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                isMouseDown = true;
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (!isMouseDown) return;
+                
+                const deltaX = e.clientX - mouseX;
+                const deltaY = e.clientY - mouseY;
+                
+                camera.position.x += deltaX * 0.1;
+                camera.position.y -= deltaY * 0.1;
+                camera.lookAt(0, 0, 0);
+                
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            // Zoom with mouse wheel
+            renderer.domElement.addEventListener('wheel', (e) => {
+                camera.position.multiplyScalar(e.deltaY > 0 ? 1.1 : 0.9);
+                camera.lookAt(0, 0, 0);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('event-count').textContent = eventCount;
+            document.getElementById('track-count').textContent = trackCount;
+            document.getElementById('efficiency').textContent = 
+                eventCount > 0 ? `${((trackCount / eventCount) * 100).toFixed(1)}%` : '0%';
+            
+            // Calculate mean χ²/DoF (simplified)
+            const meanChi2 = particles.length > 0 ? 
+                particles.reduce((sum, p) => sum + p.hits.length, 0) / particles.length / 2 : 0;
+            document.getElementById('chi2').textContent = meanChi2.toFixed(2);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Generate new particles based on rate
+            if (Math.random() < SIM_CONFIG.particleRate / 60) { // 60 FPS adjustment
+                generateParticle();
+            }
+            
+            // Update existing particles
+            particles = particles.filter(particle => particle.update(1/60));
+            
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const canvasContainer = document.getElementById('canvas-container');
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        });
+
+        // Initialize simulation
+        init();
+    </script>
+</body>
+</html>

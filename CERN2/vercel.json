@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "name": "atlas-detector-simulation",
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

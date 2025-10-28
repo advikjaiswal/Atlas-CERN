@@ -1,0 +1,30 @@
+{
+  "name": "atlas-detector-simulation",
+  "version": "1.0.0",
+  "description": "ATLAS-inspired particle detector simulation with Kalman filter tracking",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "echo 'Static site - no build needed'",
+    "dev": "npx serve . -l 3000"
+  },
+  "keywords": [
+    "physics", 
+    "particle-detector", 
+    "CERN", 
+    "ATLAS", 
+    "kalman-filter", 
+    "three.js",
+    "simulation"
+  ],
+  "author": "CERN Internship Candidate",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.0.0"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/atlas-detector-simulation"
+  }
+}
